@@ -74,10 +74,13 @@ void debugserialprint (String text, format) {
 }
 */
 
-// RGB HSV routines
-// ***************************
+/*******************************************************************
+ * Code to convert RGB value to HSV and back in order to calculate expected V as brightness
+ * code taken from https://stackoverflow.com/questions/3018313/algorithm-to-convert-rgb-to-hsv-and-hsv-to-rgb-in-range-0-255-for-both
+*******************************************************************/
 
-// 
+
+// required variables
 typedef struct RgbColor
 {
     unsigned char r;
@@ -191,10 +194,24 @@ void allOff() {
   analogWrite(bluPin, 0);
 }
 
+
+
+//Compute current brightness value
+void getV() {
+  R = roundf(r/2.55);
+  G = roundf(g/2.55);
+  B = roundf(b/2.55);
+  x = _max(R,G);
+  V = _max(x, B);
+  decString = String(V); // save the value in string variable
+  
+}
+
 //Write requested hex-color to the pins
 void setHex() {
-  // this reads the value from hexString as set
   state = 1;
+  Serial.print("Recorded hexstring: "); // uncomment for serial output
+  Serial.println(hexString); // uncomment for serial output
   long number = (long) strtol( &hexString[0], NULL, 16);
   r = number >> 16;
   g = number >> 8 & 0xFF;
@@ -202,93 +219,98 @@ void setHex() {
   analogWrite(redPin, (r));
   analogWrite(grnPin, (g));
   analogWrite(bluPin, (b));
+  getV(); // update the brightness from new color
 }
 
-//Computes and returns current brightness value
-void getV() {
-  R = roundf(r / 2.55);
-  G = roundf(g / 2.55);
-  B = roundf(b / 2.55);
-  x = _max(R, G);
-  V = _max(x, B);
-}
+
 
 //Set new brightness value
 void setV() {
-  state = 1; // we turn on
-  int brightness = (int) atoi( &decString[0]);
-  Serial.print("Brightness requested: ");
-  Serial.print(brightness);
-  Serial.println("%");
-  Serial.print("Current RGB: ");
-  
-  Serial.print(r);
-  Serial.print(".");
-  Serial.print(g);
-  Serial.print(".");
-  Serial.println(b);
+
+  int brightness = (int) atoi( &decString[0]); // get the numer from the string passed (atoi will stop at any non number char)
+  decString = String(V); // save the number value back to conserve the brightness as set
+//  Serial.print("Brightness requested: "); // uncomment for serial output
+//  Serial.print(brightness); // uncomment for serial output
+//  Serial.println("%"); // uncomment for serial output
+//  Serial.print("Current RGB: "); // uncomment for serial output
+//  
+//  Serial.print(r); // uncomment for serial output
+//  Serial.print("."); // uncomment for serial output
+//  Serial.print(g); // uncomment for serial output
+//  Serial.print("."); // uncomment for serial output
+//  Serial.println(b); // uncomment for serial output
+
+// get the HSV equivalent of current color, recalculate V and back to RGB
+
   if (brightness == 0) {
-    state = 0; // turn it off, if brightness is 0
-    r = 0;
-    g = 0;
-    b = 0;
+    // this will send /off we shoud not set the color to 0
+    
+    
   }
-  else
-  { 
-    RgbColor rgb; // we'll convert RGB to HSV to find what new V value should be
+  else {
+    //state = 1; // we might not need this as brightness setup does turn on
+    RgbColor rgb;
     rgb.r = r;
     rgb.g = g;
     rgb.b = b;
     HsvColor hsv = RgbToHsv(rgb);
-    hsv.v = brightness * 2.55;
-    
-    Serial.print("V for HSV: ");
-    Serial.println(hsv.v);
+    hsv.v = brightness * 2.55; // convert 0-100 to 0-255
+//    Serial.print("V for HSV: "); // uncomment for serial output
+//    Serial.println(hsv.v); // uncomment for serial output
     RgbColor rgb2 = HsvToRgb(hsv);
-    r = rgb2.r;
-    g = rgb2.g;
-    b = rgb2.b;
     
+    hexString = String(createRGB(rgb2.r, rgb2.g, rgb2.b), HEX); // change the ref for hexstring
+    //setHex(); // will refer to hexString value
+    // above is not needed as brightness set via homekit request is always followed by /on request, which will call setHex() and use hexstring
+   
+    // reset hexString to reflect new color rgb in Hex 
+    // should not change from previous if brightness 0
+//  hexString = String(createRGB(r, g, b), HEX);
+ 
+//  Serial.print("New RGB: "); // uncomment for serial output
+//  Serial.print(r); // uncomment for serial output
+//  Serial.print("."); // uncomment for serial output
+//  Serial.print(g); // uncomment for serial output
+//  Serial.print("."); // uncomment for serial output
+//  Serial.println(b); // uncomment for serial output
+//  Serial.print("Updated Hex string: "); // uncomment for serial output
+//  Serial.println(hexString); // uncomment for serial output
+
+    // set the pins // not needed, sethex does it
+//  analogWrite(redPin, (r));
+//  analogWrite(grnPin, (g));
+//  analogWrite(bluPin, (b));
+
   }
   
-  Serial.print("New RGB: ");
-  Serial.print(r);
-  Serial.print(".");
-  Serial.print(g);
-  Serial.print(".");
-  Serial.println(b);
-  // reset hexString to reflect new color rgb in Hex
-  hexString = String(createRGB(r, g, b), HEX);
-  Serial.print("Updated Hex string: ");
-  Serial.println(hexString);
-
-  // set the pins
-  analogWrite(redPin, (r));
-  analogWrite(grnPin, (g));
-  analogWrite(bluPin, (b));
-
+//  showValues(); //Uncomment for serial output
 }
+
 
 //For serial debugging only
 void showValues() {
+  
+  getV();
+  
   Serial.print("Status on/off: ");
   Serial.println(state);
-  Serial.print("RGB color: ");
+  Serial.print("RGB color:");
   Serial.print(r);
   Serial.print(".");
   Serial.print(g);
   Serial.print(".");
   Serial.println(b);
-  Serial.print("Hex color: ");
+  Serial.print("RGB color: full value in decimal ");
   Serial.println(createRGB(r, g, b));
-  
+  Serial.print("RGB color: #");
   Serial.println(String(createRGB(r, g, b), HEX));
-  Serial.print("Value of string passed in previous queries (either hex color or brightness requested): ");
+  Serial.print("Value of hex color memorized: #");
   Serial.println(hexString);
+  Serial.print("Value of brightness memorized: ");
   Serial.println(decString);
-  getV();
-  Serial.print("Calculated Brightness: ");
+  Serial.print("Current Brightness: ");
   Serial.println(V);
+  Serial.println("");
 }
 
 // Initial setup (called by main code setup() )
@@ -333,6 +355,16 @@ void main_run() {
           client.println();
 
           // TODO : switch case on matched string so that we can wrap it and do a error response too
+          
+                    
+          /*********************
+          * commands:
+          * - on
+          * - off
+          * - set/[RGB HEX color value]
+          * - light/[Decimal 0-100 brightness value]
+          *********************/
+          
           //On
           if (readString.indexOf("on") > 0) {
             setHex();
@@ -365,11 +397,20 @@ void main_run() {
             //Serial.println(readString.indexOf("light"));
             Serial.print("Set brightness: ");
             decString = "";
-            decString = (readString.substring(11));
+            decString = (readString.substring(11)); // not stopping as am not sure where to stop. Anyway atoi will take only the number
             Serial.println(decString);
             setV();
             showValues();
           }
+
+                   
+          /*********************
+          * information requests:
+          * - status
+          * - color
+          * - brightness
+          *********************/
+      
 
           //Status on/off
           if (readString.indexOf("status") > 0) {
