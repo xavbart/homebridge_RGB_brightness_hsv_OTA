@@ -19,7 +19,6 @@ void setup() {
     ESP.restart();
   }
   
-  setup_run();
 
   // Port defaults to 3232
   // ArduinoOTA.setPort(3232);
@@ -65,11 +64,16 @@ void setup() {
   Serial.println("Ready");
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
+
+  // calls the sub-module set-up
+  setup_run();
 }
 
 void loop() {
   // this handles the IDE OTA process
   ArduinoOTA.handle();
   //Serial.println("Running main in loop");
+  
+  // calls the sub-module run for the loop
   main_run();
 }

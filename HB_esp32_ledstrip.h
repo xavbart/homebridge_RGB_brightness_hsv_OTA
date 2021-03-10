@@ -26,6 +26,8 @@ beware the keywords are parsed so it will have to be different keywords for all 
 =======
  */
 
+// TODO: correct hsv rgb code to account for potential arduino overflow as mentioned here https://stackoverflow.com/a/22120275/5510832
+
 //#include <WiFi.h>
 #include <analogWrite.h>
 #include <math.h>
@@ -366,7 +368,8 @@ void main_run() {
           *********************/
           
           //On
-          if (readString.indexOf("on") > 0) {
+          if ((readString.indexOf("on") > 0 ) && (readString.indexOf("favicon") < 0) && (readString.indexOf("version") < 0)) {
+            // we want to avoid call to 'on' when the string has the two letters in it
             setHex();
             showValues();
           }
